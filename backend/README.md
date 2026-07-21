@@ -1,58 +1,116 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Vía Libre Oaxaca — Backend (Laravel + AWS)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+API de alertas de bloqueos del Istmo de Tehuantepec. **Laravel** como framework,
+**DynamoDB** como base de datos, **Amazon Location** para mapas/rutas y **SNS**
+para alertas. Se desarrolla en local con **Docker** y se despliega en **AWS
+Lambda con Bref**, provisionado por **Terraform** (con presupuesto de $10).
 
-## About Laravel
+## Arquitectura
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+Frontend (Nuxt)
+    │  HTTPS
+    ▼
+API Gateway ──► Lambda (Laravel + Bref) ──► DynamoDB        (bloqueos, TTL)
+                                        ├──► Amazon Location (rutas + geocode)
+                                        └──► SNS             (alertas)
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Endpoints (prefijo `/api`)
 
-## Contributing
+| Método | Ruta                          | Qué hace                                  |
+|--------|-------------------------------|-------------------------------------------|
+| GET    | `/api/reportes`               | Lista bloqueos activos (para el mapa)     |
+| POST   | `/api/reportes`               | Registra un bloqueo                       |
+| POST   | `/api/reportes/{id}/confirmar`| Vota `sigue` o `liberado`                 |
+| GET    | `/api/rutas`                  | Ruta A→B + bloqueos sobre ella            |
+| GET    | `/api/geocode?texto=`         | Nombre de lugar → coordenadas             |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Desarrollo local (Docker) — sin AWS, sin costo
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Requiere solo **Docker**. Levanta Laravel + DynamoDB Local y siembra datos del Istmo:
 
-## Security Vulnerabilities
+```bash
+cd backend
+docker compose up --build
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- API en **http://localhost:8000/api**
+- La primera vez instala dependencias y crea/siembra la tabla automáticamente.
 
-## License
+Comandos útiles:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+# Probar la API
+curl http://localhost:8000/api/reportes
+
+# Reejecutar la siembra
+docker compose exec app php artisan dynamo:sembrar --force
+
+# Ver logs
+docker compose logs -f app
+
+# Apagar
+docker compose down
+```
+
+> Nota: `/api/rutas` y `/api/geocode` usan Amazon Location (AWS), así que en
+> local devuelven error si no hay credenciales de AWS. El núcleo (reportes +
+> mapa) funciona 100% en local con DynamoDB Local.
+
+---
+
+## Desplegar en AWS
+
+Requiere: **AWS CLI** configurado (`aws configure`), **Docker** y **Terraform**.
+
+```bash
+cd backend
+bash scripts/desplegar.sh
+```
+
+El script: crea el repositorio ECR, construye la imagen de Laravel con Bref, la
+sube, y aplica el resto de la infraestructura (DynamoDB, Location, Cognito, SNS,
+API Gateway y el presupuesto de $10). Al final imprime los valores para
+`frontend/.env`.
+
+| Output de Terraform | Variable en `frontend/.env`    |
+|---------------------|--------------------------------|
+| `api_url`           | `NUXT_PUBLIC_API_URL`          |
+| `region`            | `NUXT_PUBLIC_AWS_REGION`       |
+| `mapa_nombre`       | `NUXT_PUBLIC_MAP_NAME`         |
+| `identity_pool_id`  | `NUXT_PUBLIC_IDENTITY_POOL_ID` |
+
+Sembrar datos de ejemplo en AWS: `curl` los POST a `api_url/reportes`, o desde
+un contenedor con las credenciales: `php artisan dynamo:sembrar --force`.
+
+### Presupuesto de $10
+
+`infra/budget.tf` crea un presupuesto mensual de **10 USD**. Para recibir avisos
+al 80% y 100%, define tu correo en `infra/terraform.tfvars` (`email_alertas`).
+El presupuesto **avisa**, no apaga recursos. Para no gastar: `terraform destroy`.
+
+> ⚠️ El despliegue con Bref no está probado contra AWS en este equipo (no hay
+> credenciales aquí). El código y la infraestructura están listos y validados
+> (`terraform validate`), pero la primera vez conviene revisar el caché de
+> Laravel en Lambda (ver la documentación de bref/laravel-bridge).
+
+---
+
+## Estructura
+
+```
+backend/
+├── app/
+│   ├── Http/Controllers/   ReporteController, RutaController
+│   ├── Console/Commands/    dynamo:crear-tabla, dynamo:sembrar
+│   └── Support/             DynamoBloqueos (repositorio), GeoIstmo
+├── config/vialibre.php      Config del proyecto (tabla, región, Istmo bbox...)
+├── routes/api.php           Endpoints
+├── docker/                  Dockerfiles (local + bref) y entrypoint
+├── docker-compose.yml       Entorno local (Laravel + DynamoDB Local)
+├── scripts/desplegar.sh     Despliegue a AWS
+└── infra/                   Terraform (DynamoDB, Lambda, Location, SNS, budget)
+```

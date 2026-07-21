@@ -1,0 +1,18 @@
+# Copia este archivo a "terraform.tfvars" y ajústalo si quieres.
+# Si no lo creas, se usan los valores por defecto de variables.tf.
+
+aws_region    = "us-east-1"
+proyecto      = "via-libre"
+entorno       = "dev"
+cors_origen   = "*"
+ttl_horas     = 2
+email_alertas = "" # tu correo para los avisos de presupuesto (opcional)
+
+# Requerido: secreto para firmar los tokens de sesión (genera uno largo y aleatorio,
+# p. ej. `openssl rand -base64 48`).
+jwt_secret = "CAMBIA-ESTO-por-un-secreto-largo-aleatorio"
+
+# Login social (opcional; vacío = dormido). Requieren crear apps de desarrollador.
+google_client_id    = ""
+facebook_app_id     = ""
+facebook_app_secret = ""

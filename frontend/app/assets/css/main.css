@@ -1,2 +1,125 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+/* ===== Paleta editorial cálida (estilo screenshots) ===== */
+@theme {
+  /* Terracota / rust — color de marca */
+  --color-terracota-50: #fbf3ee;
+  --color-terracota-100: #f6e2d6;
+  --color-terracota-200: #ecc3ac;
+  --color-terracota-300: #e0a07d;
+  --color-terracota-400: #d17d52;
+  --color-terracota-500: #bf5b34;
+  --color-terracota-600: #a8482a;
+  --color-terracota-700: #8a3823;
+  --color-terracota-800: #6f2f20;
+  --color-terracota-900: #5c291e;
+  --color-terracota-950: #33130d;
+
+  /* Verde pino — confirmar / "sigue así" */
+  --color-pino-50: #eef5f1;
+  --color-pino-100: #d6e7de;
+  --color-pino-200: #aecfbf;
+  --color-pino-300: #7fb09b;
+  --color-pino-400: #548c77;
+  --color-pino-500: #3c6f5c;
+  --color-pino-600: #2f5d4c;
+  --color-pino-700: #274b3e;
+  --color-pino-800: #213d33;
+  --color-pino-900: #1c332b;
+  --color-pino-950: #0f1d18;
+
+  /* Ámbar — "programado" */
+  --color-ambar-50: #fdf7ec;
+  --color-ambar-100: #f8e8c6;
+  --color-ambar-200: #f1d089;
+  --color-ambar-300: #eab653;
+  --color-ambar-400: #e0982f;
+  --color-ambar-500: #c97d20;
+  --color-ambar-600: #a85f1a;
+  --color-ambar-700: #86471a;
+  --color-ambar-800: #6f3a1a;
+  --color-ambar-900: #5e3118;
+  --color-ambar-950: #351909;
+
+  /* Crema de fondo */
+  --color-crema: #f6efe1;
+  --color-crema-suave: #fbf7ee;
+
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+}
+
+/* Fondo crema por defecto y tipografía */
+body {
+  background-color: var(--color-crema);
+  color: #33302b;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Chrome tipo ventana para la tarjeta-preview del mapa en el landing */
+.chrome-ventana::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  width: 42px;
+  height: 8px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle 4px at 4px 4px, #e0664b 99%, transparent) 0 0/14px 8px repeat-x;
+}
+
+/* ===== Animaciones ===== */
+@keyframes subir {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes radar {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes flotar-lento {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(0, -14px); }
+}
+
+/* Reveal on scroll (directiva v-reveal) */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal-visible { opacity: 1; transform: none; }
+
+/* Entrada del hero + flotación suave del preview */
+.anim-subir { animation: subir 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.flotante-suave { animation: flotar-lento 7s ease-in-out infinite; }
+
+/* Micro-interacciones */
+.hover-lift { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+.hover-lift:hover { transform: translateY(-4px); box-shadow: 0 16px 32px -12px rgb(0 0 0 / 0.25); }
+.press { transition: transform 0.12s ease; }
+.press:active { transform: scale(0.96); }
+
+/* Marcador con pulso "radar" (activos) */
+.marcador-radar {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--c);
+  animation: radar 1.9s ease-out infinite;
+}
+
+/* Transición de página */
+.page-enter-active, .page-leave-active { transition: opacity 0.28s ease, transform 0.28s ease; }
+.page-enter-from { opacity: 0; transform: translateY(10px); }
+.page-leave-to { opacity: 0; transform: translateY(-8px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .anim-subir, .flotante-suave, .marcador-radar { animation: none; opacity: 1; transform: none; transition: none; }
+}
