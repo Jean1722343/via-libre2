@@ -16,6 +16,8 @@ import 'widgets/feed_panel.dart';
 import 'widgets/route_panel.dart';
 import 'widgets/report_sheet.dart';
 import 'widgets/interactive_button.dart';
+import 'widgets/auth_modal.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -89,11 +91,54 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _inicializarSesion();
     _inicializarUbicacion();
     _cargarDatos();
     
     // Timer para refrescar datos cada 30 segundos
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _cargarDatos());
+  }
+
+  Future<void> _inicializarSesion() async {
+    await ApiService.rehidratarSesion();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _verificarReporte(String id) async {
+    final ok = await _apiService.verificarReporte(id);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Reporte marcado como verificado!'), backgroundColor: Color(0xFF10B981)),
+      );
+      _cargarDatos();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo verificar el reporte'), backgroundColor: Color(0xFFDC2626)),
+      );
+    }
+  }
+
+  Future<void> _finalizarReporte(String id) async {
+    final ok = await _apiService.finalizarReporte(id);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reporte marcado como finalizado'), backgroundColor: Color(0xFFF59E0B)),
+      );
+      _cargarDatos();
+    }
+  }
+
+  Future<void> _eliminarReporte(String id) async {
+    final ok = await _apiService.eliminarReporte(id);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reporte eliminado'), backgroundColor: Color(0xFFDC2626)),
+      );
+      _cargarDatos();
+    }
   }
 
   @override
@@ -444,6 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildDrawer() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final usuario = ApiService.usuarioActual;
     
     return Drawer(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -455,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
               image: DecorationImage(
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  Colors.black.withOpacity(isDark ? 0.70 : 0.45),
+                  Colors.black.withOpacity(isDark ? 0.75 : 0.50),
                   BlendMode.darken,
                 ),
                 image: const NetworkImage(
@@ -464,35 +510,54 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             currentAccountPicture: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white24,
-              ),
-              padding: const EdgeInsets.all(4),
-              child: const CircleAvatar(
-                backgroundImage: NetworkImage(
-                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop',
+                border: Border.all(
+                  color: usuario?.rolColor ?? Colors.white38,
+                  width: 2,
                 ),
               ),
+              child: CircleAvatar(
+                backgroundColor: isDark ? const Color(0xFF131B26) : Colors.white,
+                backgroundImage: usuario?.foto != null && usuario!.foto!.isNotEmpty
+                    ? NetworkImage(usuario.foto!)
+                    : null,
+                child: usuario?.foto == null || usuario!.foto!.isEmpty
+                    ? Icon(usuario?.rolIcono ?? Icons.person, color: usuario?.rolColor ?? const Color(0xFFBF5B34))
+                    : null,
+              ),
             ),
-            accountName: const Text(
-              'Usuario Demo',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+            accountName: Text(
+              usuario?.nombre ?? 'Invitado',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
             ),
-            accountEmail: const Text(
-              'istmo.vecino@vialibre.mx',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+            accountEmail: Text(
+              usuario?.email ?? 'Toca para iniciar sesión',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
+            onDetailsPressed: () {
+              Navigator.pop(context);
+              if (usuario != null) {
+                ProfileScreen.show(context, onSessionChanged: () => setState(() {}));
+              } else {
+                AuthModal.show(context, onLoginExitoso: () => setState(() {}));
+              }
+            },
           ),
           ListTile(
-            leading: Icon(Icons.person, color: isDark ? Colors.white70 : const Color(0xFF78716C)),
-            title: const Text('Mi Cuenta'),
-            subtitle: const Text('Configurar perfil y reputación'),
+            leading: Icon(
+              usuario != null ? Icons.person : Icons.login,
+              color: usuario?.rolColor ?? (isDark ? Colors.white70 : const Color(0xFF78716C)),
+            ),
+            title: Text(usuario != null ? 'Mi Cuenta' : 'Iniciar Sesión / Registro'),
+            subtitle: Text(usuario != null ? 'Perfil, rol de ${usuario.rolEtiqueta} y moderación' : 'Accede a tu cuenta de Vía Libre'),
             onTap: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sección de Cuenta (Próximamente disponible)')),
-              );
+              if (usuario != null) {
+                ProfileScreen.show(context, onSessionChanged: () => setState(() {}));
+              } else {
+                AuthModal.show(context, onLoginExitoso: () => setState(() {}));
+              }
             },
           ),
           ListTile(
@@ -953,7 +1018,55 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: isDark ? Colors.white : const Color(0xFF2F5D4C),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
+
+                            // LED Indicador de conexión AWS Cloud u Offline
+                            Tooltip(
+                              message: ApiService.isOffline ? 'Modo Sin Conexión (Caché Local)' : 'Conectado a AWS Cloud Live',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: ApiService.isOffline 
+                                      ? const Color(0xFFF59E0B).withOpacity(0.18) 
+                                      : const Color(0xFF10B981).withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: ApiService.isOffline ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 7,
+                                      height: 7,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: ApiService.isOffline ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: (ApiService.isOffline ? const Color(0xFFF59E0B) : const Color(0xFF10B981)).withOpacity(0.8),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      ApiService.isOffline ? 'OFFLINE' : 'AWS',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: ApiService.isOffline ? const Color(0xFFB45309) : const Color(0xFF10B981),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             
                             // Badge que coincide de forma coherente con el filtro activo actual
                             Container(
@@ -1277,6 +1390,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           _mapController.move(LatLng(b.lat, b.lng), 13.0);
                         },
                         onConfirmar: _onConfirmar,
+                        onVerificar: _verificarReporte,
+                        onFinalizar: _finalizarReporte,
+                        onEliminar: _eliminarReporte,
                         cargando: _cargando,
                       ),
                     ),

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
+import '../../services/api_service.dart';
+import 'auth_modal.dart';
 
 class ReportSheet extends StatefulWidget {
   final LatLng posicion;
@@ -57,7 +59,7 @@ class _ReportSheetState extends State<ReportSheet> {
         });
       }
     } catch (e) {
-      // Ignorar o registrar
+      // Ignorar
     }
   }
 
@@ -83,6 +85,13 @@ class _ReportSheetState extends State<ReportSheet> {
   }
 
   void _enviar() {
+    if (ApiService.usuarioActual == null) {
+      AuthModal.show(context, onLoginExitoso: () {
+        setState(() {});
+      });
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
     
     setState(() {
@@ -98,7 +107,7 @@ class _ReportSheetState extends State<ReportSheet> {
       'municipio': _municipioController.text.trim(),
       'ruta_alterna_texto': _rutaAlternaController.text.trim(),
       'inicia_en': _iniciaEn?.toIso8601String(),
-      'foto': _fotoAdjunta,
+      'foto_archivo': _fotoAdjunta,
     };
 
     widget.onEnviar(datos);
@@ -106,9 +115,13 @@ class _ReportSheetState extends State<ReportSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final usuario = ApiService.usuarioActual;
+
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
+        color: isDark ? const Color(0xFF090E17) : const Color(0xFFF6EFE1),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
@@ -131,36 +144,91 @@ class _ReportSheetState extends State<ReportSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Reportar Bloqueo',
                     style: TextStyle(
                       fontFamily: 'Playfair Display',
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2F5D4C),
+                      color: isDark ? Colors.white : const Color(0xFF2F5D4C),
                     ),
                   ),
                   IconButton(
                     onPressed: widget.onCancelar,
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close, color: isDark ? Colors.white60 : Colors.grey[600]),
                   ),
                 ],
               ),
-              const Divider(),
+              Divider(color: isDark ? Colors.grey[800] : const Color(0xFFE2D6C5)),
               const SizedBox(height: 8),
+
+              // Banner Informativo de Autenticación / Rol
+              if (usuario == null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFBF5B34).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFBF5B34).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.lock_outline, color: Color(0xFFBF5B34), size: 20),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Inicia sesión para enviar tu reporte al mapa de Vía Libre.',
+                          style: TextStyle(color: Color(0xFFBF5B34), fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => AuthModal.show(context, onLoginExitoso: () => setState(() {})),
+                        child: const Text('Ingresar', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: usuario.rolColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: usuario.rolColor.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(usuario.rolIcono, color: usuario.rolColor, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          usuario.esNoticieroOAdmin
+                              ? '⚡ Como ${usuario.rolEtiqueta}, tu reporte aparecerá VERIFICADO al instante.'
+                              : 'ℹ️ Tu reporte requerirá 2 confirmaciones comunitarias para marcarse como Verificado.',
+                          style: TextStyle(color: usuario.rolColor, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // Coordenadas informativas
               Text(
                 'Ubicación seleccionada: ${widget.posicion.latitude.toStringAsFixed(5)}, ${widget.posicion.longitude.toStringAsFixed(5)}',
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                style: TextStyle(color: isDark ? Colors.white60 : Colors.grey[600], fontSize: 12),
               ),
               const SizedBox(height: 12),
 
               // Campo de Selección de Tipo
-              const Text('Tipo de Bloqueo', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Tipo de Bloqueo', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 value: _tipoSeleccionado,
+                dropdownColor: isDark ? const Color(0xFF131B26) : Colors.white,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -169,79 +237,69 @@ class _ReportSheetState extends State<ReportSheet> {
                   DropdownMenuItem(value: 'manifestacion', child: Text('🔊 Manifestación')),
                   DropdownMenuItem(value: 'obra', child: Text('🚧 Obra vial')),
                   DropdownMenuItem(value: 'accidente', child: Text('💥 Accidente')),
-                  DropdownMenuItem(value: 'conflicto', child: Text('🔥 Conflicto social')),
+                  DropdownMenuItem(value: 'conflicto', child: Text('⚠️ Conflicto social')),
                   DropdownMenuItem(value: 'derrumbe', child: Text('🪨 Derrumbe')),
-                  DropdownMenuItem(value: 'otro', child: Text('⚠️ Otro')),
+                  DropdownMenuItem(value: 'otro', child: Text('❓ Otro')),
                 ],
                 onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _tipoSeleccionado = val;
-                    });
-                  }
+                  if (val != null) setState(() => _tipoSeleccionado = val);
                 },
               ),
               const SizedBox(height: 12),
 
-              // Estado: Activo / Programado
-              const Text('Vigencia del Reporte', style: TextStyle(fontWeight: FontWeight.bold)),
+              // Campo de Estado (Activo vs Programado)
+              Text('Estado del Incidente', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
                     child: RadioListTile<String>(
-                      title: const Text('Activo ahora', style: TextStyle(fontSize: 13)),
+                      title: Text('Activo Ahora', style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
                       value: 'activo',
                       groupValue: _estadoSeleccionado,
                       contentPadding: EdgeInsets.zero,
                       onChanged: (val) {
-                        setState(() {
-                          _estadoSeleccionado = val!;
-                          _iniciaEn = null;
-                        });
+                        if (val != null) setState(() => _estadoSeleccionado = val);
                       },
                     ),
                   ),
                   Expanded(
                     child: RadioListTile<String>(
-                      title: const Text('Programado', style: TextStyle(fontSize: 13)),
+                      title: Text('Programado', style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
                       value: 'programado',
                       groupValue: _estadoSeleccionado,
                       contentPadding: EdgeInsets.zero,
                       onChanged: (val) {
-                        setState(() {
-                          _estadoSeleccionado = val!;
-                        });
+                        if (val != null) setState(() => _estadoSeleccionado = val);
                       },
                     ),
                   ),
                 ],
               ),
 
-              // Selector de Hora de Inicio (Solo si es Programado)
+              // Selector de Hora de Inicio (Solo si es programado)
               if (_estadoSeleccionado == 'programado') ...[
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: _seleccionarHoraInicio,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[400]!),
+                      border: Border.all(color: Colors.grey),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.calendar_today, size: 16, color: Color(0xFFBF5B34)),
-                        const SizedBox(width: 8),
                         Text(
                           _iniciaEn == null
                               ? 'Seleccionar fecha y hora de inicio'
-                              : 'Inicia el: ${DateFormat('dd/MM/yyyy HH:mm').format(_iniciaEn!)}',
+                              : 'Inicia: ${DateFormat('dd/MM/yyyy HH:mm').format(_iniciaEn!)}',
                           style: TextStyle(
-                            color: _iniciaEn == null ? Colors.grey[600] : Colors.black,
-                            fontSize: 13,
+                            color: _iniciaEn == null ? Colors.grey : (isDark ? Colors.white : Colors.black87),
                           ),
                         ),
+                        const Icon(Icons.calendar_today, size: 18),
                       ],
                     ),
                   ),
@@ -249,81 +307,69 @@ class _ReportSheetState extends State<ReportSheet> {
                 const SizedBox(height: 12),
               ],
 
-              // Municipio
-              const Text('Municipio', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
+              // Campo Municipio
               TextFormField(
                 controller: _municipioController,
-                validator: (val) => val == null || val.isEmpty ? 'Especifica el municipio' : null,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
-                  hintText: 'Ej. Santo Domingo Tehuantepec',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  labelText: 'Municipio / Ciudad (ej. Juchitán, Tehuantepec)',
+                  labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey[600]),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Ingresa el municipio';
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
 
-              // Descripción
-              const Text('Detalles / Qué está pasando', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
+              // Campo Descripción
               TextFormField(
                 controller: _descripcionController,
                 maxLines: 2,
-                maxLength: 280,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
-                  hintText: 'Ej. Pobladores bloquean la entrada al puente caracol',
-                  contentPadding: const EdgeInsets.all(12),
+                  labelText: 'Detalles adicionales (punto de referencia, motivo...)',
+                  labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey[600]),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
               const SizedBox(height: 12),
 
-              // Ruta Alterna Sugerida
-              const Text('Ruta Alterna Sugerida (Opcional)', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
+              // Campo Ruta Alterna Sugerida
               TextFormField(
                 controller: _rutaAlternaController,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
-                  hintText: 'Ej. Desvío por el libramiento de peaje',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  labelText: 'Ruta alterna sugerida (opcional)',
+                  labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey[600]),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Foto adjunta
-              const Text('Foto del incidente (Opcional)', style: TextStyle(fontWeight: FontWeight.bold)),
+              // Adjuntar Foto
+              Text('Fotografía de evidencia (opcional)', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 8),
               if (_fotoAdjunta != null)
                 Stack(
+                  alignment: Alignment.topRight,
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.file(
                         File(_fotoAdjunta!.path),
-                        height: 150,
+                        height: 120,
                         width: double.infinity,
                         fit: BoxFit.cover,
                       ),
                     ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _fotoAdjunta = null;
-                          });
-                        },
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: const Icon(Icons.close, color: Colors.white, size: 18),
-                        ),
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.red),
+                      onPressed: () => setState(() => _fotoAdjunta = null),
                     ),
                   ],
                 )
@@ -334,40 +380,29 @@ class _ReportSheetState extends State<ReportSheet> {
                       child: OutlinedButton.icon(
                         onPressed: () => _seleccionarFoto(ImageSource.camera),
                         icon: const Icon(Icons.camera_alt),
-                        label: const Text('Tomar Foto'),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFBF5B34)),
-                          foregroundColor: const Color(0xFFBF5B34),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
+                        label: const Text('Cámara'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => _seleccionarFoto(ImageSource.gallery),
                         icon: const Icon(Icons.photo_library),
                         label: const Text('Galería'),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF2F5D4C)),
-                          foregroundColor: const Color(0xFF2F5D4C),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
                       ),
                     ),
                   ],
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Acciones
+              // Botones Acción
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _subiendo ? null : widget.onCancelar,
+                      onPressed: widget.onCancelar,
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: const Text('Cancelar'),
                     ),
@@ -379,16 +414,15 @@ class _ReportSheetState extends State<ReportSheet> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2F5D4C),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: _subiendo
                           ? const SizedBox(
-                              height: 18,
-                              width: 18,
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : const Text('Enviar Reporte'),
+                          : Text(usuario == null ? 'Ingresar y Publicar' : 'Publicar Reporte'),
                     ),
                   ),
                 ],

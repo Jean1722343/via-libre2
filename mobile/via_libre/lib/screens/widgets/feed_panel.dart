@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/bloqueo.dart';
+import '../../../services/api_service.dart';
 
 class FeedPanel extends StatelessWidget {
   final List<Bloqueo> bloqueos;
@@ -9,6 +10,9 @@ class FeedPanel extends StatelessWidget {
   final Function(String) onFiltroChanged;
   final Function(Bloqueo) onCardTap;
   final Function(String, String) onConfirmar; // id, voto
+  final Function(String)? onVerificar;
+  final Function(String)? onFinalizar;
+  final Function(String)? onEliminar;
   final bool cargando;
 
   const FeedPanel({
@@ -18,6 +22,9 @@ class FeedPanel extends StatelessWidget {
     required this.onFiltroChanged,
     required this.onCardTap,
     required this.onConfirmar,
+    this.onVerificar,
+    this.onFinalizar,
+    this.onEliminar,
     required this.cargando,
   });
 
@@ -219,6 +226,7 @@ class FeedPanel extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final tipoColor = _getColorForTipo(b.tipo);
     final tiempo = _formatTiempoRelativo(b.creadoEn);
+    final usuario = ApiService.usuarioActual;
 
     return Container(
       margin: const EdgeInsets.only(top: 12),
@@ -252,7 +260,7 @@ class FeedPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Fila Superior: Tipo, Verificado y Tiempo
+                  // Fila Superior: Tipo, Badge de Verificación y Tiempo
                   Row(
                     children: [
                       Container(
@@ -270,22 +278,46 @@ class FeedPanel extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 6),
                       if (b.verificado == true) ...[
-                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4A8B71).withOpacity(0.1),
+                            color: const Color(0xFF4A8B71).withOpacity(0.12),
                             borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: const Color(0xFF4A8B71).withOpacity(0.3)),
                           ),
                           child: const Row(
                             children: [
                               Icon(Icons.verified, size: 12, color: Color(0xFF4A8B71)),
-                              SizedBox(width: 2),
+                              SizedBox(width: 3),
                               Text(
                                 'Verificado',
                                 style: TextStyle(
                                   color: Color(0xFF4A8B71),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.hourglass_top, size: 12, color: Color(0xFFF59E0B)),
+                              SizedBox(width: 3),
+                              Text(
+                                'Por verificar',
+                                style: TextStyle(
+                                  color: Color(0xFFB45309),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 10,
                                 ),
@@ -324,6 +356,25 @@ class FeedPanel extends StatelessWidget {
                         fontSize: 13,
                         color: isDark ? Colors.white70 : const Color(0xFF78716C),
                       ),
+                    ),
+                  ],
+
+                  // Detalle de Autor si existe
+                  if (b.autorNombre != null && b.autorNombre!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          b.autorRol == 'admin' ? Icons.shield : (b.autorRol == 'noticiero' ? Icons.newspaper : Icons.person_outline),
+                          size: 13,
+                          color: b.autorRol == 'admin' ? const Color(0xFF8B5CF6) : Colors.grey[500],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Reportado por: ${b.autorNombre}',
+                          style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey[600]),
+                        ),
+                      ],
                     ),
                   ],
 
@@ -396,7 +447,7 @@ class FeedPanel extends StatelessWidget {
                     ),
                   ],
 
-                  // Fila Inferior: Votos y Acciones de Confirmación
+                  // Fila Inferior: Votos y Acciones de Confirmación / Moderación
                   const SizedBox(height: 12),
                   Divider(height: 1, color: isDark ? Colors.grey[800] : const Color(0xFFE2D6C5)),
                   const SizedBox(height: 12),
@@ -421,6 +472,40 @@ class FeedPanel extends StatelessWidget {
                         ],
                       ),
                       const Spacer(),
+
+                      // Acciones para moderador / admin
+                      if (usuario != null && usuario.esNoticieroOAdmin && b.verificado != true && onVerificar != null) ...[
+                        InkWell(
+                          onTap: () => onVerificar!(b.id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFF3B82F6)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.check_outlined, size: 12, color: Color(0xFF3B82F6)),
+                                SizedBox(width: 2),
+                                Text('Verificar', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+
+                      if (usuario != null && usuario.esAdmin && onEliminar != null) ...[
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
+                          onPressed: () => onEliminar!(b.id),
+                          tooltip: 'Eliminar Reporte',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
 
                       // Botones de votar si no es finalizado
                       if (b.estado != 'finalizado') ...[
