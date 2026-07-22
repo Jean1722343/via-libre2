@@ -91,36 +91,52 @@ function limpiarMarcadores() {
   marcadores = []
 }
 
+// Pin tipo "gota" anclado en la punta (anchor:'bottom'): la punta señala la
+// coordenada exacta y no se desplaza al hacer zoom.
+// IMPORTANTE: el contenedor NO lleva `position` inline — MapLibre le aplica
+// `position:absolute` vía la clase `.maplibregl-marker`; si lo forzamos a
+// `relative` el marcador se sale de sitio al hacer zoom.
 function elementoMarcador(b: Bloqueo): HTMLElement {
   const estadoMeta = ESTADOS_META[b.estado] ?? ESTADOS_META.activo
+  const color = estadoMeta.color
   const verificado = b.verificado !== false
-  const wrap = document.createElement('div')
-  wrap.style.cssText = 'position:relative;width:30px;height:30px'
+  const glifo = GLIFOS[b.estado] ?? '!'
 
-  // Pulso "radar" solo en activos verificados (llama la atención sin gritar).
+  const wrap = document.createElement('div')
+  wrap.className = 'vl-pin'
+  wrap.style.cssText = 'width:34px;height:44px;cursor:pointer'
+  wrap.title = TIPOS_META[b.tipo]?.etiqueta ?? ''
+
+  // Pulso "radar" alrededor de la cabeza, solo en activos verificados.
   if (b.estado === 'activo' && verificado) {
     const ring = document.createElement('span')
     ring.className = 'marcador-radar'
-    ring.style.setProperty('--c', estadoMeta.color)
+    ring.style.setProperty('--c', color)
+    ring.style.cssText += ';width:26px;height:26px;left:4px;top:3px;right:auto;bottom:auto'
     wrap.appendChild(ring)
   }
 
-  const pin = document.createElement('div')
-  const borde = verificado ? '2.5px solid #fff' : '2.5px dashed #fff'
-  pin.style.cssText = `position:relative;display:flex;align-items:center;justify-content:center;
-    width:30px;height:30px;border-radius:9999px;background:${estadoMeta.color};
-    border:${borde};box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:pointer;
-    color:#fff;font-weight:700;font-size:15px;line-height:1;font-family:system-ui;
-    opacity:${verificado ? 1 : 0.92}`
-  pin.textContent = GLIFOS[b.estado] ?? '!'
-  pin.title = TIPOS_META[b.tipo]?.etiqueta ?? ''
-  wrap.appendChild(pin)
+  // Forma de la gota en SVG (borde blanco; punteado si está por verificar).
+  const dash = verificado ? '' : 'stroke-dasharray="3.6 2.6"'
+  wrap.insertAdjacentHTML('beforeend', `
+    <svg width="34" height="44" viewBox="0 0 34 44" fill="none"
+      style="position:relative;display:block;filter:drop-shadow(0 3px 4px rgba(0,0,0,.32))">
+      <path d="M17 42.5 C17 42.5 4.5 26 4.5 15.5 A12.5 12.5 0 1 1 29.5 15.5 C29.5 26 17 42.5 17 42.5 Z"
+        fill="${color}" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" ${dash}/>
+    </svg>`)
+
+  // Glifo centrado en la cabeza.
+  const glyphEl = document.createElement('div')
+  glyphEl.textContent = glifo
+  glyphEl.style.cssText = `position:absolute;top:8px;left:0;width:34px;text-align:center;
+    color:#fff;font-weight:800;font-size:15px;line-height:1;font-family:system-ui;pointer-events:none`
+  wrap.appendChild(glyphEl)
 
   // Badge "?" para los reportes por verificar.
   if (!verificado) {
     const badge = document.createElement('span')
     badge.textContent = '?'
-    badge.style.cssText = `position:absolute;top:-3px;right:-3px;width:15px;height:15px;border-radius:9999px;
+    badge.style.cssText = `position:absolute;top:-1px;right:1px;width:16px;height:16px;border-radius:9999px;
       background:#e0982f;color:#fff;border:2px solid #fff;font-size:10px;font-weight:800;
       display:flex;align-items:center;justify-content:center;line-height:1;font-family:system-ui`
     wrap.appendChild(badge)
@@ -134,7 +150,7 @@ function contenidoPopup(b: Bloqueo): HTMLElement {
   const verificado = b.verificado !== false
   const conf = confianza(b)
   const cont = document.createElement('div')
-  cont.style.cssText = 'font-family:Inter,system-ui;min-width:220px;max-width:250px;color:#33302b'
+  cont.style.cssText = 'font-family:\'Plus Jakarta Sans\',system-ui;min-width:224px;max-width:252px;color:#33302b'
   const foto = b.foto_url
     ? `<img src="${b.foto_url}" alt="Foto" style="width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:8px">`
     : ''
@@ -167,7 +183,7 @@ function contenidoPopup(b: Bloqueo): HTMLElement {
       <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a8a29e">${meta.etiqueta}</span>
       <span style="margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:${estadoMeta.color}1a;color:${estadoMeta.color}">${estadoMeta.etiqueta}</span>
     </div>
-    <strong style="font-size:15px">${b.municipio || 'Istmo'}</strong>
+    <strong style="font-size:17px;font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.01em">${b.municipio || 'Istmo'}</strong>
     <div style="margin:4px 0 6px">${insignia}</div>
     <div style="font-size:12px;color:#57534e;margin:2px 0 6px">${b.descripcion || ''}</div>
     ${autor}
@@ -190,8 +206,8 @@ function dibujarBloqueos() {
   if (!mapa) return
   limpiarMarcadores()
   for (const b of props.bloqueos) {
-    const popup = new maplibregl.Popup({ offset: 18 }).setDOMContent(contenidoPopup(b))
-    const m = new maplibregl.Marker({ element: elementoMarcador(b) })
+    const popup = new maplibregl.Popup({ offset: 26, closeButton: false }).setDOMContent(contenidoPopup(b))
+    const m = new maplibregl.Marker({ element: elementoMarcador(b), anchor: 'bottom' })
       .setLngLat([b.lng, b.lat])
       .setPopup(popup)
       .addTo(mapa)
@@ -268,8 +284,8 @@ watch(() => props.modoReporte, (activo) => {
   <div class="relative h-full w-full">
     <div ref="contenedor" class="h-full w-full" />
 
-    <!-- Leyenda del mapa -->
-    <div class="pointer-events-none absolute bottom-3 left-3 hidden rounded-xl bg-white/90 px-3 py-2 text-xs shadow-lg ring-1 ring-black/5 backdrop-blur sm:block">
+    <!-- Leyenda del mapa (se corre para no chocar con el panel flotante en desktop) -->
+    <div class="glass pointer-events-none absolute bottom-3 left-3 hidden rounded-xl px-3 py-2 text-xs shadow-lg sm:block md:left-[384px]">
       <div class="mb-1 flex items-center gap-2"><span class="size-3 rounded-full bg-terracota-600" /> Activo</div>
       <div class="mb-1 flex items-center gap-2"><span class="size-3 rounded-full bg-ambar-500" /> Programado</div>
       <div class="flex items-center gap-2"><span class="size-3 rounded-full border-2 border-dashed border-stone-400 bg-stone-300" /> Por verificar</div>

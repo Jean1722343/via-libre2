@@ -27,21 +27,20 @@ const menu = computed(() => [
 </script>
 
 <template>
-  <header class="flex h-14 shrink-0 items-center gap-3 border-b border-stone-200 bg-white px-3 sm:px-4">
+  <header class="glass flex h-14 items-center gap-2 rounded-full px-2.5 sm:gap-3 sm:px-3">
     <NuxtLink to="/" class="flex items-center gap-2">
       <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" size="sm" square />
-      <span class="flex size-7 items-center justify-center rounded-lg bg-terracota-600 text-white">
+      <span class="flex size-8 items-center justify-center rounded-xl bg-terracota-600 text-white shadow-sm">
         <UIcon name="i-lucide-triangle-alert" />
       </span>
-      <span class="font-display hidden text-lg font-bold text-stone-800 sm:inline">ViaLibre</span>
+      <span class="font-display hidden text-lg font-bold text-pino-800 sm:inline">Vía Libre</span>
     </NuxtLink>
 
-    <div class="ml-2 flex items-center gap-3 text-sm text-stone-500">
-      <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-terracota-600" /> {{ conteos.activos }} activos</span>
-      <span class="hidden items-center gap-1.5 sm:flex"><span class="size-2 rounded-full bg-ambar-500" /> {{ conteos.programados }} programados</span>
-    </div>
+    <span class="ml-1 flex items-center gap-1.5 rounded-full bg-terracota-600 px-2.5 py-1 text-xs font-bold text-white">
+      <span class="size-1.5 animate-pulse rounded-full bg-white" /> {{ conteos.activos }} activos
+    </span>
 
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ml-auto flex items-center gap-1 sm:gap-2">
       <UButton
         :icon="alertasActivas ? 'i-lucide-bell-ring' : 'i-lucide-bell'"
         :color="alertasActivas ? 'primary' : 'neutral'"

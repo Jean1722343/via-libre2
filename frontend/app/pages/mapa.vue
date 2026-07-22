@@ -148,22 +148,47 @@ function cerrarRuta() {
 </script>
 
 <template>
-  <div class="flex h-dvh flex-col bg-crema">
-    <MapaBarraMapa
-      :conteos="conteos"
-      :alertas-activas="alertas.activas.value"
-      :alertas-soportado="alertas.soportado.value"
-      :usuario="auth.usuario.value"
-      @reportar="iniciarReporte"
-      @toggle-alertas="activarAlertas"
-      @entrar="entrar"
-      @salir="auth.salir()"
-    />
+  <div class="relative h-dvh overflow-hidden bg-crema">
+    <!-- MAPA de fondo (a pantalla completa, estilo app móvil) -->
+    <div class="absolute inset-0">
+      <ClientOnly>
+        <MapaBloqueos
+          ref="mapaRef"
+          :bloqueos="bloqueos"
+          :rutas="rutasMapa"
+          :modo-reporte="modoReporte"
+          @mapa-click="posicionNueva = $event"
+          @confirmar="onConfirmar"
+          @seleccionar-ruta="rutaActivaId = $event"
+        />
+        <template #fallback>
+          <div class="flex h-full items-center justify-center text-stone-400">Cargando mapa…</div>
+        </template>
+      </ClientOnly>
+    </div>
 
-    <MapaFiltrosEstado v-model="estadoTab" :conteos="conteos" />
+    <!-- Barra + filtros flotantes (glass) -->
+    <div class="pointer-events-none absolute inset-x-0 top-0 z-30 p-3">
+      <div class="pointer-events-auto mx-auto flex max-w-5xl flex-col gap-2">
+        <MapaBarraMapa
+          :conteos="conteos"
+          :alertas-activas="alertas.activas.value"
+          :alertas-soportado="alertas.soportado.value"
+          :usuario="auth.usuario.value"
+          @reportar="iniciarReporte"
+          @toggle-alertas="activarAlertas"
+          @entrar="entrar"
+          @salir="auth.salir()"
+        />
+        <div class="w-full sm:max-w-sm">
+          <MapaFiltrosEstado v-model="estadoTab" :conteos="conteos" />
+        </div>
+      </div>
+    </div>
 
-    <div class="flex min-h-0 flex-1 overflow-hidden">
-      <div class="hidden w-[380px] shrink-0 md:block">
+    <!-- Panel de reportes flotante (desktop, glass) -->
+    <div class="pointer-events-none absolute bottom-3 left-3 top-32 z-20 hidden w-[360px] md:block">
+      <div class="glass pointer-events-auto flex h-full flex-col overflow-hidden rounded-3xl">
         <MapaPanelReportes
           :bloqueos="bloqueos"
           :cargando="cargando"
@@ -172,90 +197,74 @@ function cerrarRuta() {
           @reportar="iniciarReporte"
         />
       </div>
-
-      <main class="relative min-w-0 flex-1">
-        <ClientOnly>
-          <MapaBloqueos
-            ref="mapaRef"
-            :bloqueos="bloqueos"
-            :rutas="rutasMapa"
-            :modo-reporte="modoReporte"
-            @mapa-click="posicionNueva = $event"
-            @confirmar="onConfirmar"
-            @seleccionar-ruta="rutaActivaId = $event"
-          />
-          <template #fallback>
-            <div class="flex h-full items-center justify-center text-stone-400">Cargando mapa…</div>
-          </template>
-        </ClientOnly>
-
-        <!-- Buscador de ruta (flotante) -->
-        <div class="pointer-events-none absolute inset-x-0 top-3 z-10 px-3">
-          <div class="pointer-events-auto mx-auto max-w-md">
-            <BuscadorRuta
-              v-if="panelRuta"
-              v-model:activa="rutaActivaId"
-              class="anim-subir"
-              @resultado="onResultadoRuta"
-              @cerrar="cerrarRuta"
-            />
-          </div>
-        </div>
-
-        <!-- Formulario de reporte (flotante) -->
-        <Transition name="slide-up">
-          <div v-if="modoReporte" class="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
-            <div class="pointer-events-auto mx-auto max-w-md">
-              <FormularioReporte :posicion="posicionNueva" @enviar="enviarReporte" @cancelar="cancelarReporte" />
-            </div>
-          </div>
-        </Transition>
-
-        <!-- Botón flotante: ruta -->
-        <div v-if="!modoReporte" class="absolute bottom-4 right-4 z-10">
-          <UButton
-            :icon="panelRuta ? 'i-lucide-x' : 'i-lucide-route'"
-            :color="panelRuta ? 'neutral' : 'primary'"
-            size="lg"
-            class="rounded-full font-semibold shadow-lg"
-            @click="panelRuta ? cerrarRuta() : (panelRuta = true)"
-          >
-            <span class="hidden sm:inline">{{ panelRuta ? 'Cerrar' : '¿Mi ruta está libre?' }}</span>
-          </UButton>
-        </div>
-
-        <!-- Botón "Ver lista" (solo móvil) -->
-        <div v-if="!modoReporte" class="absolute bottom-4 left-4 z-10 md:hidden">
-          <UButton
-            icon="i-lucide-list"
-            color="neutral"
-            size="lg"
-            class="rounded-full font-semibold shadow-lg"
-            @click="listaMovil = true"
-          >
-            Lista ({{ bloqueos.length }})
-          </UButton>
-        </div>
-
-        <!-- Panel de reportes como cajón en móvil -->
-        <Transition name="slide-up">
-          <div v-if="listaMovil" class="absolute inset-0 z-30 flex flex-col bg-crema md:hidden">
-            <div class="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-              <span class="font-display text-lg font-bold text-stone-800">Reportes</span>
-              <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="listaMovil = false" />
-            </div>
-            <MapaPanelReportes
-              class="min-h-0 flex-1"
-              :bloqueos="bloqueos"
-              :cargando="cargando"
-              @confirmar="onConfirmar"
-              @seleccionar="(b) => { seleccionar(b); listaMovil = false }"
-              @reportar="() => { listaMovil = false; iniciarReporte() }"
-            />
-          </div>
-        </Transition>
-      </main>
     </div>
+
+    <!-- Buscador de ruta (flotante) -->
+    <div class="pointer-events-none absolute inset-x-0 top-32 z-30 px-3 md:pl-[396px]">
+      <div class="pointer-events-auto mx-auto max-w-md">
+        <BuscadorRuta
+          v-if="panelRuta"
+          v-model:activa="rutaActivaId"
+          class="anim-subir"
+          @resultado="onResultadoRuta"
+          @cerrar="cerrarRuta"
+        />
+      </div>
+    </div>
+
+    <!-- Formulario de reporte (flotante) -->
+    <Transition name="slide-up">
+      <div v-if="modoReporte" class="pointer-events-none absolute inset-x-0 bottom-0 z-30 p-3 md:pl-[396px]">
+        <div class="pointer-events-auto mx-auto max-w-md">
+          <FormularioReporte :posicion="posicionNueva" @enviar="enviarReporte" @cancelar="cancelarReporte" />
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Botón flotante: ruta -->
+    <div v-if="!modoReporte" class="absolute bottom-4 right-4 z-20">
+      <UButton
+        :icon="panelRuta ? 'i-lucide-x' : 'i-lucide-route'"
+        :color="panelRuta ? 'neutral' : 'primary'"
+        size="lg"
+        class="rounded-full font-semibold shadow-lg"
+        @click="panelRuta ? cerrarRuta() : (panelRuta = true)"
+      >
+        <span class="hidden sm:inline">{{ panelRuta ? 'Cerrar' : '¿Mi ruta está libre?' }}</span>
+      </UButton>
+    </div>
+
+    <!-- Botón "Ver lista" (solo móvil) -->
+    <div v-if="!modoReporte" class="absolute bottom-4 left-4 z-20 md:hidden">
+      <UButton
+        icon="i-lucide-list"
+        color="neutral"
+        size="lg"
+        class="glass-fuerte rounded-full font-semibold text-stone-700 shadow-lg"
+        variant="ghost"
+        @click="listaMovil = true"
+      >
+        Lista ({{ bloqueos.length }})
+      </UButton>
+    </div>
+
+    <!-- Panel de reportes como cajón en móvil -->
+    <Transition name="slide-up">
+      <div v-if="listaMovil" class="absolute inset-0 z-40 flex flex-col bg-crema md:hidden">
+        <div class="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+          <span class="font-display text-lg font-bold text-stone-800">Reportes</span>
+          <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="listaMovil = false" />
+        </div>
+        <MapaPanelReportes
+          class="min-h-0 flex-1"
+          :bloqueos="bloqueos"
+          :cargando="cargando"
+          @confirmar="onConfirmar"
+          @seleccionar="(b) => { seleccionar(b); listaMovil = false }"
+          @reportar="() => { listaMovil = false; iniciarReporte() }"
+        />
+      </div>
+    </Transition>
   </div>
 </template>
 

@@ -6,7 +6,7 @@
           <span class="flex size-7 items-center justify-center rounded-lg bg-terracota-600 text-white">
             <UIcon name="i-lucide-triangle-alert" />
           </span>
-          <span class="font-display text-lg font-bold text-stone-800">ViaLibre</span>
+          <span class="font-display text-lg font-bold text-stone-800">Vía Libre</span>
         </div>
         <p class="mt-2 max-w-xs text-sm text-stone-500">
           Alertas comunitarias de bloqueos carreteros en el Istmo de Tehuantepec, Oaxaca.

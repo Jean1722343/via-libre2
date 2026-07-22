@@ -16,7 +16,7 @@ const enlaces = [
         <span class="flex size-8 items-center justify-center rounded-lg bg-terracota-600 text-white shadow-sm">
           <UIcon name="i-lucide-triangle-alert" class="text-lg" />
         </span>
-        <span class="font-display text-xl font-bold text-stone-800">ViaLibre</span>
+        <span class="font-display text-xl font-bold text-pino-950">Vía Libre</span>
       </NuxtLink>
 
       <nav class="hidden items-center gap-7 md:flex">

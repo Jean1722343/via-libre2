@@ -11,7 +11,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <aside class="flex h-full w-full flex-col border-r border-stone-200 bg-crema">
+  <aside class="flex h-full w-full flex-col bg-transparent">
     <div class="flex items-center justify-between px-4 pb-2 pt-4">
       <div>
         <h2 class="font-display text-2xl font-bold text-stone-800">Reportes recientes</h2>
